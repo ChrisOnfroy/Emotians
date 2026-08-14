@@ -1,0 +1,11 @@
+# Stage 1 configuration: no detector or classifier is loaded.
+camera:
+  index: 0
+  width: 1280
+  height: 720
+
+preview:
+  window_name: EMOTIANS — Stage 1 Preview
+  roi_width_ratio: 0.42
+  roi_height_ratio: 0.58
+  quit_keys: [q, ESC]

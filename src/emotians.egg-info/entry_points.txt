@@ -1,0 +1,2 @@
+[console_scripts]
+emotians = emotians.app:main

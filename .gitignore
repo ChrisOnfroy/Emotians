@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated data and training artefacts
+data/raw/
+data/processed/
+artifacts/checkpoints/
+artifacts/runs/
+*.pt
+*.onnx
+
+# Python test tooling
+.pytest_cache/
+
+# Local editor and OS files
+.vscode/
+.idea/
+Thumbs.db
