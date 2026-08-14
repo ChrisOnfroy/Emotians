@@ -3,14 +3,11 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+*.egg-info/
 
-# Generated data and training artefacts
-data/raw/
-data/processed/
-artifacts/checkpoints/
-artifacts/runs/
-*.pt
-*.onnx
+# Generated data and training artefacts are intentionally versioned in this
+# private repository. Do not move this project to a public repository without
+# restoring exclusions for facial images and model checkpoints.
 
 # Python test tooling
 .pytest_cache/

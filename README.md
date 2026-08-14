@@ -8,6 +8,8 @@ pre-trained model.
 Start with the project blueprint in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 For an implementation-focused Stage 1 report in Spanish, see
 [docs/AVANCE_1.md](docs/AVANCE_1.md).
+The Stage 2 dataset and from-scratch classifier guide is in
+[docs/AVANCE_2.md](docs/AVANCE_2.md).
 
 ## Stage 1: camera preview
 

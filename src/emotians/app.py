@@ -1,4 +1,4 @@
-"""Console entry point for the Stage 1 OpenCV webcam preview."""
+"""Console entry point for the EMOTIANS staged console application."""
 
 from __future__ import annotations
 
@@ -21,7 +21,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="EMOTIANS console prototype")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="Path to YAML configuration")
     parser.add_argument("--camera", type=int, default=None, help="Override the configured camera index")
-    parser.add_argument("--mode", choices=("preview",), default="preview", help="Available Stage 1 mode")
+    parser.add_argument(
+        "--mode",
+        choices=("preview", "prepare-data", "download-fer2013", "prepare-fer2013", "train", "evaluate"),
+        default="preview",
+        help="Application mode",
+    )
+    parser.add_argument("--data-root", type=Path, default=Path("data/raw/expressions"))
+    parser.add_argument("--manifest", type=Path, default=Path("data/processed/splits.csv"))
+    parser.add_argument("--output-dir", type=Path, default=Path("artifacts/runs/stage_2"))
+    parser.add_argument("--checkpoint", type=Path, default=None, help="Checkpoint required for evaluate mode")
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--device", default="auto", help="auto, cpu, cuda, or a PyTorch device string")
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--verbose", action="store_true", help="Enable debug logs")
     return parser.parse_args()
 
@@ -82,11 +95,55 @@ def main() -> int:
     args = parse_args()
     configure_logging(args.verbose)
     try:
+        if args.mode != "preview":
+            return _run_stage_two(args)
         config = load_config(args.config)
         return run_preview(config, args.camera)
-    except ValueError as error:
-        LOGGER.error("Configuration error: %s", error)
+    except (RuntimeError, ValueError) as error:
+        LOGGER.error("Application error: %s", error)
         return 1
+
+
+def _run_stage_two(args: argparse.Namespace) -> int:
+    """Run the data, training or evaluation command introduced in Stage 2."""
+
+    from emotians.training.cli import (
+        evaluate_classifier,
+        download_and_prepare_fer2013,
+        format_report,
+        prepare_data,
+        prepare_fer2013,
+        train_classifier,
+    )
+
+    if args.mode == "prepare-data":
+        report = prepare_data(args.data_root, args.manifest, args.seed)
+    elif args.mode == "download-fer2013":
+        report = download_and_prepare_fer2013(args.manifest, args.seed)
+    elif args.mode == "prepare-fer2013":
+        report = prepare_fer2013(args.data_root, args.manifest, args.seed)
+    elif args.mode == "train":
+        if args.epochs < 1 or args.batch_size < 1:
+            raise ValueError("--epochs and --batch-size must be positive integers.")
+        report = train_classifier(
+            args.data_root,
+            args.manifest,
+            args.output_dir,
+            args.epochs,
+            args.batch_size,
+            args.device,
+            args.seed,
+        )
+    else:
+        if args.batch_size < 1:
+            raise ValueError("--batch-size must be a positive integer.")
+        if args.checkpoint is None:
+            raise ValueError("--checkpoint is required when --mode evaluate is used.")
+        report = evaluate_classifier(
+            args.data_root, args.manifest, args.checkpoint, args.batch_size, args.device
+        )
+    print(format_report(report))
+    return 0
 
 
 if __name__ == "__main__":
