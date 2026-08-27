@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import torch
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
@@ -21,6 +22,7 @@ def create_app(
     face_model_path: str | Path = DEFAULT_FACE_MODEL,
     expression_model_path: str | Path = DEFAULT_EXPRESSION_MODEL,
 ) -> FastAPI:
+    torch.set_num_threads(1)
     app = FastAPI(title="EMOTIANS", version="0.1.0")
     detector = YuNetFaceDetector(face_model_path)
     classifier = ExpressionCNNClassifier(expression_model_path)
@@ -38,6 +40,7 @@ def create_app(
         result = process_frame(image, detector, classifier, expression_threshold=0.45)
         return {
             "status": result.status,
+            "frame_size": [image.shape[1], image.shape[0]],
             "detections": [
                 {"box": detection.xyxy, "confidence": detection.confidence}
                 for detection in result.detections
@@ -147,8 +150,8 @@ WEB_PAGE = """<!doctype html>
     </main>
     <script>
         const video=document.querySelector('#video'),canvas=document.querySelector('#overlay'),toggle=document.querySelector('#toggle'),expression=document.querySelector('#expression'),confidence=document.querySelector('#confidence'),status=document.querySelector('#status'),headerStatus=document.querySelector('#header-status'),statusDot=document.querySelector('#status-dot'),liveTag=document.querySelector('#live-tag'),ctx=canvas.getContext('2d');let stream=null,timer=null,busy=false;
-        function draw(result){const sx=canvas.width/video.videoWidth,sy=canvas.height/video.videoHeight;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.lineWidth=4;ctx.strokeStyle='#c8f36b';ctx.fillStyle='#c8f36b';ctx.font='600 18px Space Grotesk';for(const item of result.detections){const[x,y,w,h]=[item.box[0]*sx,item.box[1]*sy,(item.box[2]-item.box[0])*sx,(item.box[3]-item.box[1])*sy];ctx.strokeRect(x,y,w,h);if(result.prediction)ctx.fillText(result.prediction.label,x+8,Math.max(24,y-8))}if(result.prediction){expression.textContent=result.prediction.label;confidence.textContent=Math.round(result.prediction.confidence*100)+'%'}else{expression.textContent='-';confidence.textContent=result.status==='no-face'?'No face detected':'Analysing'}status.textContent=result.status==='ok'?'Signal stable':result.status}
-        async function analyze(){if(busy||!stream||!video.videoWidth)return;busy=true;canvas.width=video.videoWidth;canvas.height=video.videoHeight;const shot=document.createElement('canvas');shot.width=video.videoWidth;shot.height=video.videoHeight;shot.getContext('2d').drawImage(video,0,0);try{const blob=await new Promise(resolve=>shot.toBlob(resolve,'image/jpeg',.78)),body=new FormData();body.append('frame',blob,'frame.jpg');const response=await fetch('/api/analyze',{method:'POST',body});if(!response.ok)throw Error();draw(await response.json())}catch(error){status.textContent='Connection error';headerStatus.textContent='Connection error'}finally{busy=false}}
+        function draw(result){const[sentWidth,sentHeight]=result.frame_size||[video.videoWidth,video.videoHeight],sx=canvas.width/sentWidth,sy=canvas.height/sentHeight;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.lineWidth=4;ctx.strokeStyle='#c8f36b';ctx.fillStyle='#c8f36b';ctx.font='600 18px Space Grotesk';for(const item of result.detections){const[x,y,w,h]=[item.box[0]*sx,item.box[1]*sy,(item.box[2]-item.box[0])*sx,(item.box[3]-item.box[1])*sy];ctx.strokeRect(x,y,w,h);if(result.prediction)ctx.fillText(result.prediction.label,x+8,Math.max(24,y-8))}if(result.prediction){expression.textContent=result.prediction.label;confidence.textContent=Math.round(result.prediction.confidence*100)+'%'}else{expression.textContent='-';confidence.textContent=result.status==='no-face'?'No face detected':'Analysing'}status.textContent=result.status==='ok'?'Signal stable':result.status}
+        async function analyze(){if(busy||!stream||!video.videoWidth)return;busy=true;canvas.width=video.videoWidth;canvas.height=video.videoHeight;const shot=document.createElement('canvas'),scale=Math.min(1,640/video.videoWidth);shot.width=Math.round(video.videoWidth*scale);shot.height=Math.round(video.videoHeight*scale);shot.getContext('2d').drawImage(video,0,0,shot.width,shot.height);try{const blob=await new Promise(resolve=>shot.toBlob(resolve,'image/jpeg',.68)),body=new FormData();body.append('frame',blob,'frame.jpg');const response=await fetch('/api/analyze',{method:'POST',body});if(!response.ok)throw Error();draw(await response.json())}catch(error){status.textContent='Connection error';headerStatus.textContent='Connection error'}finally{busy=false}}
         async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});video.srcObject=stream;video.hidden=false;toggle.textContent='Detener cámara';status.textContent='Conectando modelo';headerStatus.textContent='Live';statusDot.classList.add('live');liveTag.textContent='Live';timer=setInterval(analyze,700)}catch(error){status.textContent='Permiso de cámara requerido';headerStatus.textContent='Camera blocked'}}function stop(){if(timer)clearInterval(timer);timer=null;if(stream)stream.getTracks().forEach(track=>track.stop());stream=null;video.hidden=true;ctx.clearRect(0,0,canvas.width,canvas.height);toggle.textContent='Activar cámara';status.textContent='Sistema detenido';headerStatus.textContent='Standby';statusDot.classList.remove('live');liveTag.textContent='Offline';expression.textContent='-';confidence.textContent='Waiting for face'}toggle.addEventListener('click',()=>stream?stop():start());
     </script>
 </body>
