@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
+
+if TYPE_CHECKING:
+    from emotians.models import FrameResult
 
 
 BoundingBox = tuple[int, int, int, int]
@@ -68,6 +73,57 @@ def draw_preview_overlay(
         cv2.FONT_HERSHEY_SIMPLEX,
         0.54,
         (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    return canvas
+
+
+def draw_live_overlay(frame_bgr: np.ndarray, result: FrameResult, fps: float) -> np.ndarray:
+    """Draw Stage 3 face detection and expression inference output."""
+
+    if frame_bgr.ndim != 3 or frame_bgr.shape[2] != 3:
+        raise ValueError("frame_bgr must be an HxWx3 BGR image.")
+
+    canvas = frame_bgr.copy()
+    color = (0, 200, 0) if result.status == "ok" else (0, 0, 255)
+    for detection in result.detections:
+        left, top, right, bottom = detection.xyxy
+        cv2.rectangle(canvas, (left, top), (right, bottom), color, 2)
+        cv2.putText(
+            canvas,
+            f"face {detection.confidence:.2f}",
+            (left, max(20, top - 8)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.54,
+            color,
+            2,
+            cv2.LINE_AA,
+        )
+
+    if result.prediction:
+        label = f"{result.prediction.label} {result.prediction.confidence:.2f}"
+    elif result.status == "no-face":
+        label = "no face"
+    else:
+        label = result.status
+    cv2.putText(
+        canvas,
+        "STAGE 3: LIVE DEMO",
+        (16, 32),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.72,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        canvas,
+        f"{label}   |   FPS: {fps:.1f}   |   q / Esc: exit",
+        (16, canvas.shape[0] - 24),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.54,
+        color,
         2,
         cv2.LINE_AA,
     )

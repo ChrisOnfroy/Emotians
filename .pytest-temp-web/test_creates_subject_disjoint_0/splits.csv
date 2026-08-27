@@ -1,0 +1,17 @@
+path,subject_id,label,split
+person_01/angry/sample.jpg,person_01,angry,validation
+person_01/happy/sample.jpg,person_01,happy,validation
+person_01/sad/sample.jpg,person_01,sad,validation
+person_01/surprised/sample.jpg,person_01,surprised,validation
+person_02/angry/sample.jpg,person_02,angry,train
+person_02/happy/sample.jpg,person_02,happy,train
+person_02/sad/sample.jpg,person_02,sad,train
+person_02/surprised/sample.jpg,person_02,surprised,train
+person_03/angry/sample.jpg,person_03,angry,test
+person_03/happy/sample.jpg,person_03,happy,test
+person_03/sad/sample.jpg,person_03,sad,test
+person_03/surprised/sample.jpg,person_03,surprised,test
+person_04/angry/sample.jpg,person_04,angry,train
+person_04/happy/sample.jpg,person_04,happy,train
+person_04/sad/sample.jpg,person_04,sad,train
+person_04/surprised/sample.jpg,person_04,surprised,train

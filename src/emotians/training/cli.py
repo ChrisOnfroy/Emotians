@@ -7,7 +7,17 @@ from pathlib import Path
 
 from emotians.data.catalog import create_split_manifest, scan_dataset, validate_dataset
 from emotians.data.dataset import ExpressionDataset
+from emotians.data.face_boxes import (
+    FaceBoxDataset,
+    create_full_image_face_manifest,
+    load_face_box_manifest,
+)
 from emotians.data.fer2013 import create_fer2013_manifest, download_fer2013
+from emotians.training.detector import (
+    DetectorTrainingConfig,
+    evaluate_detector_checkpoint,
+    train_detector,
+)
 from emotians.training.engine import TrainingConfig, evaluate_checkpoint, train
 
 
@@ -40,6 +50,12 @@ def prepare_fer2013(data_root: Path, manifest: Path, seed: int) -> dict[str, obj
     }
 
 
+def prepare_fer2013_detector(data_root: Path, source_manifest: Path, output_manifest: Path) -> dict[str, object]:
+    """Create a quick detector manifest from FER2013 cropped face images."""
+
+    return create_full_image_face_manifest(data_root, source_manifest, output_manifest)
+
+
 def train_classifier(
     data_root: Path,
     manifest: Path,
@@ -68,6 +84,62 @@ def evaluate_classifier(
 
     test_data = ExpressionDataset(load_manifest(data_root, manifest, "test"))
     return evaluate_checkpoint(test_data, checkpoint, batch_size=batch_size, device_name=device)
+
+
+def train_face_detector(
+    image_root: Path,
+    manifest: Path,
+    output_dir: Path,
+    epochs: int,
+    batch_size: int,
+    input_size: int,
+    device: str,
+    seed: int,
+    confidence_threshold: float,
+) -> dict[str, object]:
+    train_data = FaceBoxDataset(
+        load_face_box_manifest(image_root, manifest, "train"),
+        input_size=input_size,
+    )
+    validation_data = FaceBoxDataset(
+        load_face_box_manifest(image_root, manifest, "validation"),
+        input_size=input_size,
+    )
+    return train_detector(
+        train_data,
+        validation_data,
+        output_dir,
+        DetectorTrainingConfig(
+            epochs=epochs,
+            batch_size=batch_size,
+            input_size=input_size,
+            device=device,
+            seed=seed,
+            confidence_threshold=confidence_threshold,
+        ),
+    )
+
+
+def evaluate_face_detector(
+    image_root: Path,
+    manifest: Path,
+    checkpoint: Path,
+    batch_size: int,
+    input_size: int,
+    device: str,
+    confidence_threshold: float,
+) -> dict[str, object]:
+    test_data = FaceBoxDataset(
+        load_face_box_manifest(image_root, manifest, "test"),
+        input_size=input_size,
+    )
+    return evaluate_detector_checkpoint(
+        test_data,
+        checkpoint,
+        batch_size=batch_size,
+        device_name=device,
+        confidence_threshold=confidence_threshold,
+    )
 
 
 def format_report(report: dict[str, object]) -> str:

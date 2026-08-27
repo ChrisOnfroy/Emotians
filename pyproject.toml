@@ -14,6 +14,9 @@ dependencies = [
   "torch>=2.5",
   "kagglehub>=0.3",
   "tqdm>=4.66,<5",
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "python-multipart>=0.0.9,<1",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +24,7 @@ dev = ["pytest>=8,<9"]
 
 [project.scripts]
 emotians = "emotians.app:main"
+emotians-web = "emotians.web:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

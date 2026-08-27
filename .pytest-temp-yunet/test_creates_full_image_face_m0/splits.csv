@@ -1,0 +1,2 @@
+path,subject_id,label,split
+train/happy/sample.jpg,unknown_fer2013,happy,train

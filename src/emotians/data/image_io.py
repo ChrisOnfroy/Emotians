@@ -23,3 +23,18 @@ def read_image(path: str | Path, flags: int = cv2.IMREAD_COLOR) -> np.ndarray | 
     if encoded.size == 0:
         return None
     return cv2.imdecode(encoded, flags)
+
+
+def write_image(path: str | Path, image: np.ndarray) -> bool:
+    """Encode and write an image while supporting Unicode Windows paths."""
+
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    success, encoded = cv2.imencode(destination.suffix or ".jpg", image)
+    if not success:
+        return False
+    try:
+        encoded.tofile(destination)
+    except OSError:
+        return False
+    return True

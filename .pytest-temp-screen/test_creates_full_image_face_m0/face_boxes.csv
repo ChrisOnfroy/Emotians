@@ -1,0 +1,2 @@
+path,split,face_present,x_min,y_min,x_max,y_max
+train/happy/sample.jpg,train,true,0,0,80,64

@@ -134,6 +134,12 @@ Deliverables:
 Exit criteria: the console demo finds a visible face, overlays one of the four
 labels, and handles missed detections safely (no stale crop or crash).
 
+**Current implementation:** Stage 3 scaffolding is now present. The repo has a
+from-scratch `TinyFaceDetector`, a face-box CSV dataset loader, detector
+training/evaluation commands, live inference orchestration, temporal smoothing,
+and a Stage 3 overlay. It still needs consented face-box annotations and trained
+project checkpoints before the live demo can satisfy the exit criteria.
+
 ### Stage 4 — Validation, packaging, and demonstration
 
 **Goal:** make the prototype dependable and easy to demonstrate.

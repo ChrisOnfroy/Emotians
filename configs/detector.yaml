@@ -1,0 +1,15 @@
+# Stage 3 detector reference configuration.
+# The current detector is anchor-free: it predicts one primary face box per
+# frame as normalized (center_x, center_y, width, height), plus objectness.
+detector:
+  model: TinyFaceDetector
+  input_size: 128
+  target_encoding: normalized_cxcywh
+  anchors: []
+  confidence_threshold: 0.5
+  iou_threshold: 0.5
+
+training:
+  epochs: 20
+  batch_size: 16
+  seed: 42

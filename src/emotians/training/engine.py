@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -47,7 +48,8 @@ def train(
     validation_loader = DataLoader(validation_data, batch_size=config.batch_size, shuffle=False)
     model = EmotionCNN(num_classes=len(EMOTION_LABELS)).to(device)
     optimizer = AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-4)
-    loss_function = nn.CrossEntropyLoss()
+    class_weights = _class_weights(train_data).to(device)
+    loss_function = nn.CrossEntropyLoss(weight=class_weights)
     best_accuracy = -1.0
     history: list[dict[str, float]] = []
 
@@ -146,6 +148,14 @@ def evaluate_model(
         metrics["per_class"] = per_class
         metrics["confusion_matrix"] = matrix.tolist()
     return metrics
+
+
+def _class_weights(dataset: ExpressionDataset) -> torch.Tensor:
+    """Give underrepresented emotion classes a proportionally larger loss."""
+
+    counts = Counter(sample.label for sample in dataset.samples)
+    weights = [len(dataset) / (len(EMOTION_LABELS) * counts[label]) for label in EMOTION_LABELS]
+    return torch.tensor(weights, dtype=torch.float32)
 
 
 def _resolve_device(device_name: str) -> torch.device:
