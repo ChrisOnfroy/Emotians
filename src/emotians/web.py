@@ -18,6 +18,27 @@ DEFAULT_FACE_MODEL = Path("artifacts/models/face_detection_yunet_2023mar.onnx")
 DEFAULT_EXPRESSION_MODEL = Path("artifacts/runs/stage_2_balanced/best_expression_cnn.pt")
 
 
+def is_low_light(
+    image_bgr: np.ndarray,
+    mean_th: float = 45.0,
+    std_th: float = 15.0,
+    dark_pct_th: float = 0.6,
+    dark_pixel_th: int = 40,
+) -> tuple[bool, dict]:
+    """Heuristic check for low-light images.
+
+    Returns (is_low_light, metrics) where metrics contains mean, std and pct_dark.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return True, {"mean": 0.0, "std": 0.0, "pct_dark": 1.0}
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    mean = float(np.mean(gray))
+    std = float(np.std(gray))
+    pct_dark = float(np.mean(gray < dark_pixel_th))
+    metrics = {"mean": mean, "std": std, "pct_dark": pct_dark}
+    return (mean < mean_th) or (std < std_th) or (pct_dark > dark_pct_th), metrics
+
+
 def create_app(
     face_model_path: str | Path = DEFAULT_FACE_MODEL,
     expression_model_path: str | Path = DEFAULT_EXPRESSION_MODEL,
@@ -37,6 +58,18 @@ def create_app(
         image = cv2.imdecode(np.frombuffer(payload, dtype=np.uint8), cv2.IMREAD_COLOR)
         if image is None:
             raise HTTPException(status_code=400, detail="The uploaded file is not a valid image.")
+        # Early low-light check to avoid unreliable predictions.
+        low_light, metrics = is_low_light(image)
+        if low_light:
+            return {
+                "status": "low-light",
+                "frame_size": [image.shape[1], image.shape[0]],
+                "detections": [],
+                "prediction": None,
+                "metrics": metrics,
+                "message": "Insufficient lighting. Please move to a brighter area or enable lights.",
+            }
+
         result = process_frame(image, detector, classifier, expression_threshold=0.45)
         return {
             "status": result.status,
@@ -78,7 +111,7 @@ LEGACY_WEB_PAGE = """<!doctype html>
 <script>
 const video=document.querySelector('#video'),canvas=document.querySelector('#overlay'),empty=document.querySelector('#empty'),toggle=document.querySelector('#toggle'),expression=document.querySelector('#expression'),confidence=document.querySelector('#confidence'),status=document.querySelector('#status'),ctx=canvas.getContext('2d');let stream=null,timer=null,busy=false;
 function draw(result){const sx=canvas.width/video.videoWidth,sy=canvas.height/video.videoHeight;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.lineWidth=4;ctx.strokeStyle='#c5ed72';ctx.fillStyle='#c5ed72';ctx.font='600 18px Space Grotesk';for(const item of result.detections){const[x,y,w,h]=[item.box[0]*sx,item.box[1]*sy,(item.box[2]-item.box[0])*sx,(item.box[3]-item.box[1])*sy];ctx.strokeRect(x,y,w,h);if(result.prediction)ctx.fillText(result.prediction.label,x+8,Math.max(24,y-8))}if(result.prediction){expression.textContent=result.prediction.label;confidence.textContent=Math.round(result.prediction.confidence*100)+'% confidence'}else{expression.textContent='-';confidence.textContent=result.status==='no-face'?'Rostro no detectado':'Analizando'}status.textContent=result.status==='ok'?'Señal estable':result.status}
-async function analyze(){if(busy||!stream||!video.videoWidth)return;busy=true;canvas.width=video.videoWidth;canvas.height=video.videoHeight;const shot=document.createElement('canvas');shot.width=video.videoWidth;shot.height=video.videoHeight;shot.getContext('2d').drawImage(video,0,0);try{const blob=await new Promise(resolve=>shot.toBlob(resolve,'image/jpeg',.78)),body=new FormData();body.append('frame',blob,'frame.jpg');const response=await fetch('/api/analyze',{method:'POST',body});if(!response.ok)throw Error();draw(await response.json())}catch(error){status.textContent='Error de conexión'}finally{busy=false}}
+async function analyze(){if(busy||!stream||!video.videoWidth)return;busy=true;canvas.width=video.videoWidth;canvas.height=video.videoHeight;const shot=document.createElement('canvas');shot.width=video.videoWidth;shot.height=video.videoHeight;shot.getContext('2d').drawImage(video,0,0);try{const blob=await new Promise(resolve=>shot.toBlob(resolve,'image/jpeg',.78)),body=new FormData();body.append('frame',blob,'frame.jpg');const response=await fetch('/api/analyze',{method:'POST',body});if(!response.ok)throw Error();const data = await response.json();if(data && data.status === 'low-light'){status.textContent = data.message || 'Poca luz detectada';return;}draw(data)}catch(error){status.textContent='Error de conexión'}finally{busy=false}}
 async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});video.srcObject=stream;video.hidden=false;empty.hidden=true;toggle.textContent='Detener cámara';status.textContent='Conectando modelo';timer=setInterval(analyze,700)}catch(error){status.textContent='Permiso de cámara requerido'}}function stop(){if(timer)clearInterval(timer);timer=null;if(stream)stream.getTracks().forEach(track=>track.stop());stream=null;video.hidden=true;empty.hidden=false;ctx.clearRect(0,0,canvas.width,canvas.height);toggle.textContent='Activar cámara';status.textContent='Sistema detenido';expression.textContent='-';confidence.textContent='Esperando rostro'}toggle.addEventListener('click',()=>stream?stop():start());
 </script></body></html>"""
 
@@ -151,7 +184,7 @@ WEB_PAGE = """<!doctype html>
     <script>
         const video=document.querySelector('#video'),canvas=document.querySelector('#overlay'),toggle=document.querySelector('#toggle'),expression=document.querySelector('#expression'),confidence=document.querySelector('#confidence'),status=document.querySelector('#status'),headerStatus=document.querySelector('#header-status'),statusDot=document.querySelector('#status-dot'),liveTag=document.querySelector('#live-tag'),ctx=canvas.getContext('2d');let stream=null,timer=null,busy=false;
         function draw(result){const[sentWidth,sentHeight]=result.frame_size||[video.videoWidth,video.videoHeight],sx=canvas.width/sentWidth,sy=canvas.height/sentHeight;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.lineWidth=4;ctx.strokeStyle='#c8f36b';ctx.fillStyle='#c8f36b';ctx.font='600 18px Space Grotesk';for(const item of result.detections){const[x,y,w,h]=[item.box[0]*sx,item.box[1]*sy,(item.box[2]-item.box[0])*sx,(item.box[3]-item.box[1])*sy];ctx.strokeRect(x,y,w,h);if(result.prediction)ctx.fillText(result.prediction.label,x+8,Math.max(24,y-8))}if(result.prediction){expression.textContent=result.prediction.label;confidence.textContent=Math.round(result.prediction.confidence*100)+'%'}else{expression.textContent='-';confidence.textContent=result.status==='no-face'?'No face detected':'Analysing'}status.textContent=result.status==='ok'?'Signal stable':result.status}
-        async function analyze(){if(busy||!stream||!video.videoWidth)return;busy=true;canvas.width=video.videoWidth;canvas.height=video.videoHeight;const shot=document.createElement('canvas'),scale=Math.min(1,640/video.videoWidth);shot.width=Math.round(video.videoWidth*scale);shot.height=Math.round(video.videoHeight*scale);shot.getContext('2d').drawImage(video,0,0,shot.width,shot.height);try{const blob=await new Promise(resolve=>shot.toBlob(resolve,'image/jpeg',.68)),body=new FormData();body.append('frame',blob,'frame.jpg');const response=await fetch('/api/analyze',{method:'POST',body});if(!response.ok)throw Error();draw(await response.json())}catch(error){status.textContent='Connection error';headerStatus.textContent='Connection error'}finally{busy=false}}
+        async function analyze(){if(busy||!stream||!video.videoWidth)return;busy=true;canvas.width=video.videoWidth;canvas.height=video.videoHeight;const shot=document.createElement('canvas'),scale=Math.min(1,640/video.videoWidth);shot.width=Math.round(video.videoWidth*scale);shot.height=Math.round(video.videoHeight*scale);shot.getContext('2d').drawImage(video,0,0,shot.width,shot.height);try{const blob=await new Promise(resolve=>shot.toBlob(resolve,'image/jpeg',.68)),body=new FormData();body.append('frame',blob,'frame.jpg');const response=await fetch('/api/analyze',{method:'POST',body});if(!response.ok)throw Error();const data = await response.json();if(data && data.status === 'low-light'){status.textContent = data.message || 'Poca luz detectada';headerStatus.textContent = 'Low light';return;}draw(data)}catch(error){status.textContent='Connection error';headerStatus.textContent='Connection error'}finally{busy=false}}
         async function start(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});video.srcObject=stream;video.hidden=false;toggle.textContent='Detener cámara';status.textContent='Conectando modelo';headerStatus.textContent='Live';statusDot.classList.add('live');liveTag.textContent='Live';timer=setInterval(analyze,700)}catch(error){status.textContent='Permiso de cámara requerido';headerStatus.textContent='Camera blocked'}}function stop(){if(timer)clearInterval(timer);timer=null;if(stream)stream.getTracks().forEach(track=>track.stop());stream=null;video.hidden=true;ctx.clearRect(0,0,canvas.width,canvas.height);toggle.textContent='Activar cámara';status.textContent='Sistema detenido';headerStatus.textContent='Standby';statusDot.classList.remove('live');liveTag.textContent='Offline';expression.textContent='-';confidence.textContent='Waiting for face'}toggle.addEventListener('click',()=>stream?stop():start());
     </script>
 </body>
