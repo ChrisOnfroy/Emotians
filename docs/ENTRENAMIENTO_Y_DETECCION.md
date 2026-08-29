@@ -1,4 +1,4 @@
-# Entrenamiento, detección y flujo completo de EMOTIANS
+1# Entrenamiento, detección y flujo completo de EMOTIANS
 
 ## Problema que se quiso resolver
 
@@ -12,7 +12,7 @@ El entrenamiento del modelo de expresiones se hizo desde cero, sin depender de u
 
 Este proceso incluyó varias etapas. Primero se recolectaron y organizaron las imágenes; luego se separaron en entrenamiento, validación y prueba; después se normalizaron y redimensionaron; y finalmente se entrenó la red con un optimizador y una función de pérdida adecuada. El entrenamiento no se limitó a una sola pasada, sino que se repitió durante varias épocas para ajustar los pesos del modelo y mejorar su desempeño.
 
-Durante el proceso se evaluó la red en validación para detectar si estaba aprendiendo correctamente o si necesitaba ajustes. Cada vez que el modelo mejoraba, se guardaba un checkpoint con su estado actual. Este checkpoint era importante porque permitía reutilizar el mejor modelo entrenado en la etapa de inferencia en tiempo real.
+Durante el proceso se evaluó la red en validación para detectar si estaba aprendiendo correctamente o si necesitaba ajustes. Cada vez que el modelo mejoraba, se guardaba un checkpoint con su estado actual. Este checkpoint era importante porque permitía reutilizar el mejor modelo entrenado en la etapa de inferencia en tiempo real. En la mejor época del entrenamiento, la red alcanzó aproximadamente un 78% de accuracy en validación, lo que indicó el punto de mayor rendimiento antes de que el modelo empezara a sobreajustarse o a estabilizarse.
 
 El modelo de expresiones se construyó como una red neuronal convolucional compacta, pensada para trabajar con rostros recortados y convertir la imagen en una confidencia por clase. Esta red era capaz de aprender las características relevantes de cada expresión y producir una probabilidad final para cada una de las categorías.
 
