@@ -168,7 +168,7 @@ WEB_PAGE = """<!doctype html>
             <div class="brand"><span class="mark"></span><h1>EMOTIANS</h1></div>
             <div class="header-meta"><span class="mono"><span class="status-dot" id="status-dot"></span><span id="header-status">Standby</span></span><span class="mono">LAB / 01</span></div>
         </header>
-        <section class="intro"><h2>Read the room.<br><em>One expression at a time.</em></h2><p>Real-time facial expression analysis, running privately through this session.<span class="credits">Created By Cristian Morales y Juan Benavides.</span></p></section>
+        <section class="intro"><h2>Read the room.<br><em>One expression at a time.</em></h2><p>Real-time facial expression analysis, running privately through this session.<span class="credits">Created By Cristian Morales and Juan Benavides.</span></p></section>
         <section class="workspace">
             <div class="stage">
                 <video id="video" autoplay playsinline hidden></video><canvas id="overlay"></canvas>
